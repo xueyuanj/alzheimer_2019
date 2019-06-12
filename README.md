@@ -9,7 +9,7 @@ Keren-Shaul, et al. 2017. Cell. (GSE98969 single-cell RNA-seq)
 
 ##
 
-1)Obtain the processed sc RNA-seq data (read counts) from ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE98nnn/GSE98969/suppl/
+1) Obtain the processed sc RNA-seq data (read counts) from ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE98nnn/GSE98969/suppl/
 
 2)Obtain mouse reference genome from GENCODE https://www.gencodegenes.org/mouse/
 
