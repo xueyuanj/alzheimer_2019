@@ -19,4 +19,4 @@ Keren-Shaul, et al. 2017. Cell. (GSE98969 single-cell RNA-seq)
 
   --> gencode.vM21.annotation.gene.txt
 ##
-4) merge the 97 samples, and calculate TPM
+4) merge the AD and WT mice (3 each)
