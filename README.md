@@ -41,7 +41,7 @@ Keren-Shaul, et al. 2017. Cell. (GSE98969 single-cell RNA-seq)
 ##
 8) explored Linnorm and Imputation (DrImpute)
 
-   $ linnorm.trial.R
+   $ impute.trial.R
    $ compare.imputation.R
 
 
