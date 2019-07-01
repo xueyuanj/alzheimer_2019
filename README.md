@@ -45,3 +45,11 @@ Keren-Shaul, et al. 2017. Cell. (GSE98969 single-cell RNA-seq)
    $ compare.imputation.R
 
 
+##
+
+
+## 2.Injury-responsive microglial (IRM)
+
+Timothy Hammond, et al. 2019. Immunity. (GSE121654 single-cell RNA-seq)
+
+##
