@@ -228,5 +228,6 @@ write.table(FindMarkers(trem2_seurat_filter, ident.1 = "stage 2 DAM" , ident.2 =
             file="~/Documents/2019_summer_eisai/results/trem2.genelist.up_2_to_homeo1.txt",
             quote = F, sep = "\t", col.names = F, row.names = T)
 
-
+trem2_try = subset(trem2_seurat_filter, idents = c("homeostatic microglia", "stage 1 DAM", "stage 2 DAM"))
+DimPlot(trem2_try, reduction = "umap",label = TRUE, pt.size = 0.5)+NoLegend()
 
