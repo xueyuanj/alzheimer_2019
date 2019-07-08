@@ -54,4 +54,10 @@ Timothy Hammond, et al. 2019. Immunity. (GSE121654 single-cell RNA-seq)
 
 ##
 
+The data cleaning steps are as usual
+
+However, the data has batch effect while batch information can't be found
+
+Manually split clusters into batches, then use Seurat data integration function to integrate the batch data
+
 $ irm.R
