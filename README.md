@@ -61,3 +61,11 @@ However, the data has batch effect while batch information can't be found
 Manually split clusters into batches, then use Seurat data integration function to integrate the batch data
 
 $ irm.R
+
+##
+
+Focus on the gene candidates that are differentially expressed in the diseased cluster
+
+$ gene.candidates.R
+
+$ compare.genelist.R
