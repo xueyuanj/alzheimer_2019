@@ -166,3 +166,83 @@ seurat.filtered = SetIdent(object = seurat.filtered, cells = pericyte, value = "
 # redo the plot with new cluster assignment
 newplot = DimPlot(seurat.filtered, reduction = "tsne", label = F, pt.size = 0.5 ) 
 ggsave(newplot, filename = "rosemap.tsne.major.cluster.jpeg", width = 10, height = 8, dpi = 150, units = "in", device='jpeg' )
+
+# get the AD and no AD patients infor
+clinical_infor = read.csv("supplement_3.csv")
+idmap = read.csv("id_mapping.csv")
+uniqidmap = unique(idmap[,c("projid", "Subject")])
+
+# table with both subject and project id
+mergeid = merge(clinical_infor, uniqidmap, by = "Subject")
+
+earlyp = dplyr::filter(mergeid, pathology.group == "early-pathology")%>%select(projid)%>%unlist()%>%as.vector()
+latep = dplyr::filter(mergeid, pathology.group == "late-pathology")%>%select(projid)%>%unlist()%>%as.vector()
+
+adpatient = c(earlyp, latep)
+noad =dplyr::filter(mergeid, pathology.group == "no-pathology")%>%select(projid)%>%unlist()%>%as.vector()
+
+# get the cell ID for each group
+adcells = dplyr::filter(paper_tsne, projid %in% adpatient)%>%select(TAG)%>%unlist()%>%as.vector()
+noadcells = dplyr::filter(paper_tsne, projid %in% noad)%>%select(TAG)%>%unlist()%>%as.vector()
+
+
+rosmap_cluster_id = as.data.frame(seurat.filtered$seurat_clusters)
+rosmap_cluster_id[,"cell"] = rownames(rosmap_cluster_id)
+colnames(rosmap_cluster_id) = c("cluster", "cell")
+
+major6types = c("excitatory neurons", "inhibitory neurons", "astrocyte", "oligodendrocyte progenitor",
+                "oligodendrocyte", "microglia")
+
+
+for(i in 1:length(major6types)){
+  thiscluster = major6types[i]
+  
+  # get the cell cluster
+  clustercells = SubsetData(seurat.filtered, ident.use = thiscluster)
+  
+  # set AD and no-AD identity
+  clustercells = SetIdent(object =clustercells, cells = adcells, value = "AD")
+  clustercells = SetIdent(object =clustercells, cells = noadcells, value = "no-AD")
+  
+  markers = FindMarkers(clustercells, ident.1 = "AD" , ident.2 = "no-AD", min.pct = 0.25, logfc.threshold = 0.25)
+  
+  tablename = paste( "AD", "no-AD", thiscluster, "txt", sep = ".")
+  write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
+}
+
+
+# early vs no ad
+# late vs early
+# late vs no ad
+earlyadcells = dplyr::filter(paper_tsne, projid %in% earlyp)%>%select(TAG)%>%unlist()%>%as.vector()
+lateadcells = dplyr::filter(paper_tsne, projid %in% latep)%>%select(TAG)%>%unlist()%>%as.vector()
+
+for(i in 1:length(major6types)){
+  thiscluster = major6types[i]
+  
+  # get the cell cluster
+  clustercells = SubsetData(seurat.filtered, ident.use = thiscluster)
+  
+  # set AD and no-AD identity
+  clustercells = SetIdent(object =clustercells, cells = earlyadcells, value = "early-AD")
+  clustercells = SetIdent(object =clustercells, cells = lateadcells, value = "late-AD")
+  clustercells = SetIdent(object =clustercells, cells = noadcells, value = "no-AD")
+  
+  # early vs no AD
+  markers = FindMarkers(clustercells, ident.1 = "early-AD" , ident.2 = "no-AD", min.pct = 0.25, logfc.threshold = 0.25)
+  tablename = paste( "early-AD", "no-AD", thiscluster, "txt", sep = ".")
+  write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
+  
+  # late vs early AD
+  markers = FindMarkers(clustercells, ident.1 = "early-AD" , ident.2 = "late-AD", min.pct = 0.25, logfc.threshold = 0.25)
+  tablename = paste( "early-AD", "late-AD", thiscluster, "txt", sep = ".")
+  write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
+  
+  # late vs no
+  markers = FindMarkers(clustercells, ident.1 = "late-AD" , ident.2 = "no-AD", min.pct = 0.25, logfc.threshold = 0.25)
+  tablename = paste( "late-AD", "no-AD", thiscluster, "txt", sep = ".")
+  write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
+  
+}
+
+
