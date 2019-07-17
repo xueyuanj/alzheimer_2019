@@ -245,4 +245,63 @@ for(i in 1:length(major6types)){
   
 }
 
+# subcluster of the microglia
+microgliacluster = subset (seurat.filtered, idents = "microglia")
+microgliacluster = NormalizeData(microgliacluster)
+microgliacluster = FindVariableFeatures(microgliacluster, selection.method = "disp", nfeatures = 3188)
+microgliacluster = ScaleData(microgliacluster, features = allgenes)
+
+# pca
+microgliacluster = RunPCA(microgliacluster, features = VariableFeatures(object = microgliacluster))
+microgliacluster = FindNeighbors(microgliacluster, dims = 1:50, k.param = 30)
+microgliacluster = FindClusters(microgliacluster, resolution = 0.3)
+microgliacluster = RunTSNE(microgliacluster, features = VariableFeatures(object = microgliacluster))
+microglia_tsne = DimPlot(microgliacluster, reduction = "tsne")
+ggsave(microglia_tsne, filename = "rosmap.tsne.microglia.sub.v4.jpeg",width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+
+# save a copy of the microglia subcluster data
+saveRDS(microgliacluster, file = "rosmap.microglia.subcluster.rds")
+microgliacluster = readRDS("rosmap.microglia.subcluster.rds")
+
+microglia_cluster_id = as.data.frame(microgliacluster$seurat_clusters)
+microglia_cluster_id[,"cell"] = rownames(microglia_cluster_id)
+colnames(microglia_cluster_id) = c("cluster", "TAG")
+
+# check the original subcluster information
+paper_mic_sub = dplyr::filter(paper_tsne, broad.cell.type == "Mic")
+compare_sub = merge(microglia_cluster_id, paper_mic_sub, by = "TAG")
+
+compare_sub = merge(microglia_cluster_id, paper_mic_sub, by = "TAG")
+table(compare_sub[, c("cluster", "Subcluster")])
+
+#    Mic0  Mic1  Mic2  Mic3
+# 0  1122  225   2     10
+# 1  13    256   1     0
+# 2  2     5     165   1
+# 3  4     23    1     90
+
+# plot the gene markers in the paper
+papermic1_marker = c("FTL", "RPLP2", "C1QC", "FTH1", "SPP1", "RPLP1", "SLC11A1", "RPL28", "RPS20", "TMEM163")
+papermic2_marker = c("SLC38A1", "STAT4", "PRF1", "FYN", "CD247", "SKAP1", "THEMIS", "NKG7", "BCL11B", "ITK")
+
+mic1marker_plot = FeaturePlot(microgliacluster, features = papermic1_marker, reduction = "tsne", ncol = 3)
+ggsave(mic1marker_plot, filename = "mic1_feature.tsne.jpeg", width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+
+mic2marker_plot = FeaturePlot(microgliacluster, features = papermic2_marker, reduction = "tsne", ncol = 3)
+ggsave(mic2marker_plot, filename = "mic2_feature.tsne.jpeg", width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+
+# run tests to identify DEG among clusters
+fourcluster = as.character(seq(0,3))
+c_pairwise = combn(fourcluster, 2)
+
+for (i in 1:ncol(c_pairwise)) {
+  c1 = c_pairwise[1, i]; c2 = c_pairwise[2, i]
+  markers = FindMarkers(microgliacluster, ident.1 = c1 , ident.2 = c2, min.pct = 0.25, logfc.threshold = 0.1)
+  tablename = paste( "mic_subcluster", c1, c2,"txt", sep = ".")
+  write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
+}
+
+# Fisher's test between microglia subclusters and traits
+
+
 
