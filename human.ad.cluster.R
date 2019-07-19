@@ -1,3 +1,4 @@
+library(boot)
 library(dplyr)
 library(ggplot2)
 library(Matrix)
@@ -106,13 +107,14 @@ micglia_c = dplyr::filter(ori_cluster_id, cluster == "11"|cluster == "18")%>%sel
 # microglia cells from the paper
 
 paper_tsne = read.delim("filtered_column_metadata.txt")
+
 right_mic = dplyr::filter(paper_tsne, broad.cell.type == "Mic")%>%select(TAG)%>%unlist()%>%as.vector()
-# 1926 cells
+# 1920 cells
 
 # check overlap
 length(intersect(micglia_c, right_mic))
 # 1920 cells
-# all the microglia are clustered as microglia in the paper
+# all the microglia in the paper
 
 # now reassign the cluster information, start with straightforward ones
 
@@ -165,6 +167,8 @@ seurat.filtered = SetIdent(object = seurat.filtered, cells = pericyte, value = "
 
 # redo the plot with new cluster assignment
 newplot = DimPlot(seurat.filtered, reduction = "tsne", label = F, pt.size = 0.5 ) 
+newplot
+
 ggsave(newplot, filename = "rosemap.tsne.major.cluster.jpeg", width = 10, height = 8, dpi = 150, units = "in", device='jpeg' )
 
 # get the AD and no AD patients infor
@@ -185,6 +189,9 @@ noad =dplyr::filter(mergeid, pathology.group == "no-pathology")%>%select(projid)
 adcells = dplyr::filter(paper_tsne, projid %in% adpatient)%>%select(TAG)%>%unlist()%>%as.vector()
 noadcells = dplyr::filter(paper_tsne, projid %in% noad)%>%select(TAG)%>%unlist()%>%as.vector()
 
+
+# identify DEG in each cell type
+# ad vs noad
 
 rosmap_cluster_id = as.data.frame(seurat.filtered$seurat_clusters)
 rosmap_cluster_id[,"cell"] = rownames(rosmap_cluster_id)
@@ -221,7 +228,7 @@ for(i in 1:length(major6types)){
   thiscluster = major6types[i]
   
   # get the cell cluster
-  clustercells = SubsetData(seurat.filtered, ident.use = thiscluster)
+  clustercells = subset(seurat.filtered, idents = thiscluster)
   
   # set AD and no-AD identity
   clustercells = SetIdent(object =clustercells, cells = earlyadcells, value = "early-AD")
@@ -290,18 +297,110 @@ ggsave(mic1marker_plot, filename = "mic1_feature.tsne.jpeg", width = 10, height 
 mic2marker_plot = FeaturePlot(microgliacluster, features = papermic2_marker, reduction = "tsne", ncol = 3)
 ggsave(mic2marker_plot, filename = "mic2_feature.tsne.jpeg", width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
 
-# run tests to identify DEG among clusters
+# run tests to identify DEG in one cluster against all others 
 fourcluster = as.character(seq(0,3))
-c_pairwise = combn(fourcluster, 2)
 
-for (i in 1:ncol(c_pairwise)) {
-  c1 = c_pairwise[1, i]; c2 = c_pairwise[2, i]
-  markers = FindMarkers(microgliacluster, ident.1 = c1 , ident.2 = c2, min.pct = 0.25, logfc.threshold = 0.1)
-  tablename = paste( "mic_subcluster", c1, c2,"txt", sep = ".")
+#c_pairwise = combn(fourcluster, 2)
+# 
+# for (i in 1:ncol(c_pairwise)) {
+#   c1 = c_pairwise[1, i]; c2 = c_pairwise[2, i]
+#   markers = FindMarkers(microgliacluster, ident.1 = c1 , ident.2 = c2, min.pct = 0.25, logfc.threshold = 0.5)
+#   tablename = paste( "mic_subcluster", c1, c2,"txt", sep = ".")
+#   write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
+# }
+
+for (i in 1:length(fourcluster)) {
+  c1 = fourcluster[i]; c2 = fourcluster[-i]
+  
+  markers = FindMarkers(microgliacluster, ident.1 = c1 , ident.2 = c2, min.pct = 0.25, logfc.threshold = 0.5)
+  tablename = paste( "mic_subcluster", c1, "txt", sep = ".")
   write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
 }
 
-# Fisher's test between microglia subclusters and traits
 
+# first merge all the available information
+cell_patient = paper_tsne[,c("TAG", "projid")]
+cluster_patient = merge(cell_patient, microglia_cluster_id, by="TAG")
+cell_trait = merge(cluster_patient, mergeid, by= "projid")
 
+# add APOE genotype data
+rosmap_clinical = read.csv("ROSMAP_Clinical_2019-05-03.csv")
+apoedf = rosmap_clinical[,c("projid", "apoe_genotype")]
 
+cell_trait = merge(cell_trait, apoedf, by = "projid")
+
+# save a copy of this file
+saveRDS(cell_trait, file = "microglia.subcluster.trait.rds")
+
+cell_trait = readRDS("microglia.subcluster.trait.rds")
+
+cat_trait = c("amyloid.group", "braaksc", "cogdx", "msex", "apoe_genotype")
+quan_trait = c("gpath", "nft", "plaq_n", "amyloid", "cogn_global_lv")
+
+# fisher's exact test for categorical traits
+
+cat_p_correct=sapply(cat_trait, function(x){
+  testtable = as.matrix(table(cell_trait[, c("cluster", x)]))
+  print(testtable)
+  ncluster = nrow(testtable); ntrait = ncol(testtable)
+  pmatrix = as.data.frame(as.matrix(NA, ncol = ntrait, nrow=ncluster))
+  for (i in 1:ncluster) {
+    for (j in 1:ntrait) {
+      
+      fishertable = as.data.frame(as.matrix(NA, ncol=2, nrow=2))
+      fishertable[1,1] = testtable[i, j]
+      fishertable[1,2] = rowSums(as.matrix(testtable[,-j]))[i]
+      fishertable[2,1] = colSums(as.matrix(testtable[-i,]))[j]
+      fishertable[2,2] = sum(testtable[-i,-j])
+      pvalue = fisher.test(fishertable)
+      pmatrix[i,j] = pvalue
+    }
+  }
+  fdr = apply(pmatrix, 2, function(x){
+    p.adjust(x, method = "bonferroni", n=4)
+  })
+  colnames(fdr) = colnames(testtable)
+  rownames(fdr) = rownames(testtable)
+  print(fdr)
+  return(fdr)
+})
+
+print(cat_p_correct)
+# save a copy
+write.table(cat_p_correct, file = "trait_subpop.cat.association.txt", quote = F, col.names = T, sep = "\t")
+
+# boostrap for microglia subclusters and traits
+cluster_ids = c("0", "1", "2", "3")
+
+p_uncorrect =  sapply(quan_trait, function(x){
+  testtable = cell_trait[, c("cluster", x)]
+  sapply(cluster_ids, function(y){
+    cluster_t = dplyr::filter(testtable, cluster == y)
+    size = nrow(cluster_t)
+   
+    # get the distribution of bootrapping
+    nulldistr = replicate(10000, {
+      onesample = sample(testtable[,x], size, replace = F)
+      mean(onesample)
+    })
+    # trait mean for this subcluster
+    clustermean = mean(cluster_t[,x])
+    
+    # calculate z-score
+    pop_sd = sd(nulldistr)*sqrt((length(nulldistr)-1)/(length(nulldistr)))
+    pop_mean = mean(nulldistr)
+    z = (clustermean - pop_mean) / pop_sd
+    
+    
+    # p-value
+    p_raw = 1 -pnorm(z)
+    print(p_raw)
+    return(c(z,p_raw))
+  } )
+} )
+print(p_uncorrect)
+
+# save a copy of the results
+write.table(p_uncorrect, file = "trait_subpop.quan.association.txt", quote = F, col.names = T, sep = "\t")
+
+# 
