@@ -365,9 +365,13 @@ cat_p_correct=sapply(cat_trait, function(x){
   return(fdr)
 })
 
-print(cat_p_correct)
 # save a copy
-write.table(cat_p_correct, file = "trait_subpop.cat.association.txt", quote = F, col.names = T, sep = "\t")
+sink("trait_subpop.cat.association.txt")
+print(cat_p_correct)
+sink()
+
+
+#write.table(cat_p_correct, file = "trait_subpop.cat.association.txt", quote = F, col.names = T, sep = "\t")
 
 # boostrap for microglia subclusters and traits
 cluster_ids = c("0", "1", "2", "3")
