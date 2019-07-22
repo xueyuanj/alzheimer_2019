@@ -407,4 +407,52 @@ print(p_uncorrect)
 # save a copy of the results
 write.table(p_uncorrect, file = "trait_subpop.quan.association.txt", quote = F, col.names = T, sep = "\t")
 
-# 
+###########################################################################################################
+# redo some analysis in a different (from the paper) way 
+# check the data
+
+
+# 1) check Ceradsc and cogdx in AD and no-AD group
+table(mergeid[, c("pathology.group", "ceradsc")])
+
+#ceradsc
+#pathology.group  1  2  3  4
+#early-pathology  8  7  0  0
+#late-pathology   9  0  0  0
+#no-pathology     0  0  2 22
+
+table(mergeid[, c("pathology.group", "cogdx")])
+#cogdx
+#pathology.group     1  2  3  4  5  6
+#early-pathology     3  2  1  9  0  0
+#late-pathology      0  0  0  9  0  0
+#no-pathology        11  6  2  3  1  1
+
+# 2) Trem2 genotype
+trem2geno = read.csv("rosmap.trem2.genotype.csv")
+trem2geno[,"total_mut"] = rowSums(trem2geno[,2:ncol(trem2geno)])
+table(trem2geno)
+
+# 0     1     2
+# 1108  41    3
+
+# rare indeed
+
+# check how many individuals in the dataset have mutation 
+checktrem2 = merge(mergeid, trem2geno, by = "projid")
+table(checktrem2$total_mut)
+
+# 0    1
+# 35   3
+
+# further analysis on Trem2 will be performed on the 38 dataset
+# cell_trait = readRDS("microglia.subcluster.trait.rds")
+
+# subset the 38 individuals
+
+trem2indiv = filter(cell_trait, projid%in%checktrem2$projid )
+# 1457 cells left
+trem2test = merge(trem2indiv, trem2geno, by = "projid") 
+
+
+
