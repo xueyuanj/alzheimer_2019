@@ -81,11 +81,19 @@ $ human.ad.cluster.R
 
 General steps:
 
-1)
+1) Unsupervised cluster
 
-2)
+2) Collapse the preclusters and get clusters that correspond to cell type (based on cell markers)
 
-A separate file for subcluster and categorical trait association test
+3) Compared DEG between AD, no AD, and among disease progression
+
+4) Subcluster of microglia
+
+5) DEG among the 4 microglia subpopulations
+
+5) microglia subpopulation and trait association test
+
+#A separate file for subcluster and categorical trait association test
 
 $ categorical.test.Rmd
 
