@@ -93,7 +93,11 @@ General steps:
 
 5) microglia subpopulation and trait association test
 
-#A separate file for subcluster and categorical trait association test
+##
+A separate file for subcluster and categorical trait association test
 
 $ categorical.test.Rmd
+
+##
+Compare genes upregulated in mouse DAM to those in human microglia 1 
 
