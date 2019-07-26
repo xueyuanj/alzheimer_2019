@@ -69,3 +69,23 @@ Focus on the gene candidates that are differentially expressed in the diseased c
 $ gene.candidates.R
 
 $ compare.genelist.R
+
+## 3.ROSMAP scRNA-seq analysis
+
+Hansruedi Mathys, et al. 2019. Nature. (limited access to the dataset)
+
+##
+All the analysis are in one script
+
+$ human.ad.cluster.R
+
+General steps:
+
+1)
+
+2)
+
+A separate file for subcluster and categorical trait association test
+
+$ categorical.test.Rmd
+
