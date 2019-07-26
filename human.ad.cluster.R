@@ -5,6 +5,7 @@ library(Matrix)
 library(Seurat)
 
 # /anaconda2/bin/R
+# /opt/R/3.6.1/bin/R
 
 setwd("/public_genomic_data_downloads/czhang/sharon/")
 
@@ -89,13 +90,13 @@ for (i in 0:18) {
   
   # highlight those cells
   cplot = DimPlot(object = seurat.filtered, cells.highlight = thiscluster, reduction = "tsne")
- 
-   # save the plot
+  
+  # save the plot
   plotname = paste(c("cluster", as.character(i), "tsne", "jpeg"), collapse = ".")
   
   ggsave(cplot, filename = plotname, width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
   
-  }
+}
 
 
 # verify the identity of microglia, how much they overlap with the results in the paper
@@ -135,7 +136,7 @@ seurat.filtered = SetIdent(object = seurat.filtered, cells = astrocyte, value = 
 
 # nuerons
 allnuerons = dplyr::filter(ori_cluster_id, cluster == "1"| cluster =="2"| cluster =="3"| cluster =="4"| cluster =="5"|
-                           cluster =="7"| cluster =="8"| cluster == "10"| cluster =="12"| cluster =="13"| cluster == "14"| cluster =="15"| cluster =="16")%>%select(cell)%>%unlist()%>%as.vector() 
+                             cluster =="7"| cluster =="8"| cluster == "10"| cluster =="12"| cluster =="13"| cluster == "14"| cluster =="15"| cluster =="16")%>%select(cell)%>%unlist()%>%as.vector() 
 
 # need coordinate information
 rosmap_embeds = as.data.frame(Embeddings(seurat.filtered[["tsne"]]))
@@ -364,13 +365,10 @@ cat_p_correct=sapply(cat_trait, function(x){
   print(fdr)
   return(fdr)
 })
-
-# save a copy
 sink("trait_subpop.cat.association.txt")
 print(cat_p_correct)
 sink()
-
-
+# save a copy
 #write.table(cat_p_correct, file = "trait_subpop.cat.association.txt", quote = F, col.names = T, sep = "\t")
 
 # boostrap for microglia subclusters and traits
@@ -381,7 +379,7 @@ p_uncorrect =  sapply(quan_trait, function(x){
   sapply(cluster_ids, function(y){
     cluster_t = dplyr::filter(testtable, cluster == y)
     size = nrow(cluster_t)
-   
+    
     # get the distribution of bootrapping
     nulldistr = replicate(10000, {
       onesample = sample(testtable[,x], size, replace = F)
@@ -431,7 +429,7 @@ table(mergeid[, c("pathology.group", "cogdx")])
 # 2) Trem2 genotype
 trem2geno = read.csv("rosmap.trem2.genotype.csv")
 trem2geno[,"total_mut"] = rowSums(trem2geno[,2:ncol(trem2geno)])
-table(trem2geno)
+table(trem2geno$total_mut)
 
 # 0     1     2
 # 1108  41    3
@@ -454,5 +452,256 @@ trem2indiv = filter(cell_trait, projid%in%checktrem2$projid )
 # 1457 cells left
 trem2test = merge(trem2indiv, trem2geno, by = "projid") 
 
+trem2input = table(trem2test[, c("cluster", "total_mut")])
+
+streamlinetest = function(x){
+  testtable = as.matrix(x)
+  #print(testtable)
+  ncluster = nrow(testtable); ntrait = ncol(testtable)
+  pmatrix = as.data.frame(as.matrix(NA, ncol = ntrait, nrow=ncluster))
+  for (i in 1:ncluster) {
+    for (j in 1:ntrait) {
+      fishertable = as.data.frame(as.matrix(NA, ncol=2, nrow=2))
+      fishertable[1,1] = testtable[i, j]
+      fishertable[1,2] = rowSums(as.matrix(testtable[,-j]))[i]
+      fishertable[2,1] = colSums(as.matrix(testtable[-i,]))[j]
+      fishertable[2,2] = sum(testtable[-i,-j])
+      #print(fishertable)
+      testresult = fisher.test(fishertable)
+      pvalue = testresult$p.value
+      #print(testresult$estimate)
+      pmatrix[i,j] = pvalue
+    }
+  }
+  fdr = apply(pmatrix, 2, function(x){
+    p.adjust(x, method = "bonferroni", n=4)
+  })
+  colnames(fdr) = colnames(testtable)
+  rownames(fdr) = rownames(testtable)
+  print(fdr)
+}
+
+streamlinechisq = function(x){
+  testtable = as.matrix(x)
+  print(chisq.test(testtable)$expected)
+  rawp = apply(testtable, 1, function(x) chisq.test(x,p=colSums(testtable)/sum(testtable), simulate.p.value = TRUE, B=10000)$p.value)
+  
+  fdr = sapply(rawp,  function(x){
+    p.adjust(x, method = "bonferroni", n=4)
+  })
+  print(fdr)
+}
 
 
+# 3) Apoe genotype
+apoetable = table(cell_trait[, c("cluster", "apoe_genotype")])
+
+# 4 and no 4
+fourornot = matrix(NA, nrow = 4, ncol = 2)
+fourornot[,1] = rowSums(apoetable[,1:2]);fourornot[,2] = rowSums(apoetable[,3:4])
+
+colnames(fourornot) = c("no4", "4"); rownames(fourornot) =c("0", "1", "2", "3")
+
+
+
+# no 4, one 4 and two 4
+noffour =  matrix(NA, nrow = 4, ncol = 3)
+noffour[, 1] = rowSums(apoetable[,1:2]); noffour[,c(2,3)] = apoetable[,3:4]
+
+colnames(noffour) = c("no4", "one4", "two4"); rownames(noffour) =c("0", "1", "2", "3")
+
+# sink(file = "trem2_genotype.apoe_genotype.mic.subcluster.txt")
+# table(mergeid[, c("pathology.group", "ceradsc")])
+# table(mergeid[, c("pathology.group", "cogdx")])
+# table(trem2geno$total_mut)
+# table(checktrem2$total_mut)
+
+
+print(trem2input)
+streamlinechisq(trem2input)
+streamlinetest(trem2input)
+
+print(fourornot)
+streamlinechisq(fourornot)
+streamlinetest(fourornot)
+
+print(noffour)
+streamlinechisq(noffour)
+streamlinetest(noffour)
+# sink()
+
+
+# repeat the test with subcluster information from the paper
+paper_tsne = read.delim("filtered_column_metadata.txt")
+paper_mic_sub = dplyr::filter(paper_tsne, broad.cell.type == "Mic")
+
+# trem2 part
+paper_trem2_subc = merge(paper_mic_sub, trem2geno, by="projid")
+paper_trem2_input = table(paper_trem2_subc[, c("Subcluster", "total_mut")])[c("Mic0", "Mic1", "Mic2", "Mic3"),]
+print(paper_trem2_input)
+streamlinechisq(paper_trem2_input)
+streamlinetest(paper_trem2_input)
+
+# apoe part
+paper_apoe_subc = merge(paper_mic_sub, cell_trait, by="TAG")
+paper_apoetable = table(paper_apoe_subc[, c("Subcluster", "apoe_genotype")])[c("Mic0", "Mic1", "Mic2", "Mic3"),]
+
+# 4 and no 4
+p_fourornot = matrix(NA, nrow = 4, ncol = 2)
+p_fourornot[,1] = rowSums(paper_apoetable[,1:2]);p_fourornot[,2] = rowSums(paper_apoetable[,3:4])
+
+colnames(p_fourornot) = c("no4", "4"); rownames(p_fourornot) =c("0", "1", "2", "3")
+
+# no 4, one 4 and two 4
+p_noffour =  matrix(NA, nrow = 4, ncol = 3)
+p_noffour[, 1] = rowSums(paper_apoetable[,1:2]); p_noffour[,c(2,3)] = paper_apoetable[,3:4]
+
+colnames(p_noffour) = c("no4", "one4", "two4"); rownames(p_noffour) =c("0", "1", "2", "3")
+
+
+print(p_fourornot)
+streamlinechisq(p_fourornot)
+streamlinetest(p_fourornot)
+
+print(p_noffour)
+streamlinechisq(p_noffour)
+streamlinetest(p_noffour)
+
+
+# redo the clustering with 500, 1000, 1500, 2000, 2500, 3000 features
+
+nfeatures = c(500, 1000, 1500, 2000, 2500, 3000)
+
+feature_selection_test = function(x){
+  seurat.filtered = readRDS("/public_genomic_data_downloads/czhang/sharon/rosmap.filtered.seurat.raw.rds")
+  
+  allgenes = rownames(seurat.filtered)
+  
+  # VlnPlot(seurat.filtered, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+  seurat.filtered = NormalizeData(seurat.filtered)
+  seurat.filtered = FindVariableFeatures(seurat.filtered, selection.method = "disp", nfeatures = x)
+  
+  seurat.filtered = ScaleData(seurat.filtered, features = allgenes)
+  
+  # pca
+  seurat.filtered = RunPCA(seurat.filtered, features = VariableFeatures(object = seurat.filtered))
+  DimPlot(seurat.filtered, reduction = "pca")
+  
+  # umap and tsne
+  seurat.filtered = FindNeighbors(seurat.filtered, dims = 1:50, k.param = 30)
+  seurat.filtered = FindClusters(seurat.filtered, resolution = 0.3)
+  #seurat.filtered = RunUMAP(seurat.filtered, features = VariableFeatures(object = seurat.filtered))
+  seurat.filtered = RunTSNE(seurat.filtered, features = VariableFeatures(object = seurat.filtered))
+  
+  # save a copy of the plot
+  ori_tsne = DimPlot(seurat.filtered, reduction = "tsne")
+  
+  ggsave(ori_tsne, filename = paste("feature", as.character(x), "rosmap.tsne.pre_cluster.jpeg", sep = "." ) ,width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # plot the cluster markers
+  # excitatory neurons
+  exmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("SLC17A7", "CAMK2A", "NRGN"))
+  ggsave(exmarker, filename =paste("feature", as.character(x), "rosmap.tsne.ex_neuron.jpeg", sep = "." ), width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # inhibitory neurons
+  inmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("SYT1", "SNAP25", "GAD1", "GAD2"))
+  ggsave(inmarker, filename = paste("feature", as.character(x),"rosmap.tsne.in_neuron.jpeg", sep = "." )  ,width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # Oligodendrocytes
+  oligmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("MBP", "MOBP", "PLP1"))
+  ggsave(oligmarker, filename =paste("feature", as.character(x), "rosmap.tsne.olig.jpeg" , sep = "." ),width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # Oligodendrocyte progenitors
+  opcmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("PDGFRA", "VCAN", "CSPG4"))
+  ggsave(opcmarker, filename = paste("feature", as.character(x),"rosmap.tsne.opc.jpeg", sep = "." ),width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # microglia
+  micmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("CD74", "CSF1R", "C3"))
+  ggsave(micmarker, filename = paste("feature", as.character(x),"rosmap.tsne.mic.jpeg", sep = "." ), width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # astrocytes
+  astmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("AQP4", "GFAP", "AQP4", "GFAP"))
+  ggsave(astmarker, filename = paste("feature", as.character(x),"rosmap.tsne.ast.jpeg", sep = "." ),width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # endothelial
+  endmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("FLT1", "CLDN5", "FLT1", "CLDN5"))
+  ggsave(endmarker, filename = paste("feature", as.character(x),"rosmap.tsne.end.jpeg", sep = "." ),width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+}
+
+sapply(nfeatures, feature_selection_test)
+
+# similarly, explore the feature selection for microglia sub-clusering
+seurat.filtered = readRDS("rosmap.miss_end_per.rds")
+microgliacluster = subset (seurat.filtered, idents = "microglia")
+
+micfeature_select = function(x){
+  microgliacluster = subset (seurat.filtered, idents = "microglia")
+  
+  allgenes = rownames(microgliacluster)
+  
+  microgliacluster = NormalizeData(microgliacluster)
+  microgliacluster = FindVariableFeatures(microgliacluster, selection.method = "disp", nfeatures = x)
+  microgliacluster = ScaleData(microgliacluster, features = allgenes)
+  
+  # pca
+  microgliacluster = RunPCA(microgliacluster, features = VariableFeatures(object = microgliacluster))
+  microgliacluster = FindNeighbors(microgliacluster, dims = 1:50, k.param = 30)
+  microgliacluster = FindClusters(microgliacluster, resolution = 0.3)
+  microgliacluster = RunTSNE(microgliacluster, features = VariableFeatures(object = microgliacluster))
+  microglia_tsne = DimPlot(microgliacluster, reduction = "tsne")
+  ggsave(microglia_tsne, filename = paste("mic.feature", as.character(x), "rosmap.tsne.microglia.sub.jpeg", sep = "." ),width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # plot the gene markers in the paper
+  papermic1_marker = c("FTL", "RPLP2", "C1QC", "FTH1", "SPP1", "RPLP1", "SLC11A1", "RPL28", "RPS20", "TMEM163")
+  papermic2_marker = c("SLC38A1", "STAT4", "PRF1", "FYN", "CD247", "SKAP1", "THEMIS", "NKG7", "BCL11B", "ITK")
+  
+  mic1marker_plot = FeaturePlot(microgliacluster, features = papermic1_marker, reduction = "tsne", ncol = 3)
+  ggsave(mic1marker_plot, filename = paste("mic.feature", as.character(x), "mic1_feature.tsne.jpeg", sep = "." ), width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  mic2marker_plot = FeaturePlot(microgliacluster, features = papermic2_marker, reduction = "tsne", ncol = 3)
+  ggsave(mic2marker_plot, filename =  paste("mic.feature", as.character(x),"mic2_feature.tsne.jpeg", sep = "." ), width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+}
+
+sapply(nfeatures, micfeature_select)
+
+# separate male and female cells, perform the sub-clustering independently
+
+femalecells = filter(cell_trait, msex=="female")%>%select(TAG)%>%unlist()%>%as.vector()
+malecells = filter(cell_trait, msex=="male")%>%select(TAG)%>%unlist()%>%as.vector()
+
+femalemic = SubsetData(object = microgliacluster, cells = femalecells)
+malemic = SubsetData(object = microgliacluster, cells = malecells)
+
+# the clustering of both datasets
+mic_sexcluster = function(x, y){
+  
+  
+  allgenes = rownames(x)
+  
+  x = NormalizeData(x)
+  x = FindVariableFeatures(x, selection.method = "disp", nfeatures = 3188)
+  x = ScaleData(x, features = allgenes)
+  
+  # pca
+  x = RunPCA(x, features = VariableFeatures(object = x))
+  x = FindNeighbors(x, dims = 1:50, k.param = 30)
+  x = FindClusters(x, resolution = 0.3)
+  x = RunTSNE(x, features = VariableFeatures(object = x))
+  microglia_tsne = DimPlot(x, reduction = "tsne")
+  ggsave(microglia_tsne, filename = paste("mic.feature", as.character(y), "rosmap.tsne.microglia.sub.jpeg", sep = "." ),width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  # plot the gene markers in the paper
+  papermic1_marker = c("FTL", "RPLP2", "C1QC", "FTH1", "SPP1", "RPLP1", "SLC11A1", "RPL28", "RPS20", "TMEM163")
+  papermic2_marker = c("SLC38A1", "STAT4", "PRF1", "FYN", "CD247", "SKAP1", "THEMIS", "NKG7", "BCL11B", "ITK")
+  
+  mic1marker_plot = FeaturePlot(x, features = papermic1_marker, reduction = "tsne", ncol = 3)
+  ggsave(mic1marker_plot, filename = paste("mic.feature", as.character(y), "mic1_feature.tsne.jpeg", sep = "." ), width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+  
+  mic2marker_plot = FeaturePlot(x, features = papermic2_marker, reduction = "tsne", ncol = 3)
+  ggsave(mic2marker_plot, filename =  paste("mic.feature", as.character(y),"mic2_feature.tsne.jpeg", sep = "." ), width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
+}
+
+mic_sexcluster(femalemic, "female")
+mic_sexcluster(malemic, "male")
