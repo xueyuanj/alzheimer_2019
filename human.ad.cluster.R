@@ -443,6 +443,10 @@ table(checktrem2$total_mut)
 # 0    1
 # 35   3
 
+# check the individuals with mutation
+dplyr::filter(checktrem2, total_mut == "1")
+
+
 # further analysis on Trem2 will be performed on the 38 dataset
 # cell_trait = readRDS("microglia.subcluster.trait.rds")
 
@@ -451,6 +455,9 @@ table(checktrem2$total_mut)
 trem2indiv = filter(cell_trait, projid%in%checktrem2$projid )
 # 1457 cells left
 trem2test = merge(trem2indiv, trem2geno, by = "projid") 
+
+# save a copy of detailed genotyped cell information
+saveRDS(trem2test, file = "trem2.rosmap.scrnaseq.rds")
 
 trem2input = table(trem2test[, c("cluster", "total_mut")])
 
@@ -705,3 +712,87 @@ mic_sexcluster = function(x, y){
 
 mic_sexcluster(femalemic, "female")
 mic_sexcluster(malemic, "male")
+
+
+# focus on the Trem2 mutations
+# trait-genotype association, normal, R62H, P208A
+trem2test = readRDS("trem2.rosmap.scrnaseq.rds")
+trem2test[,"trem2_geno"] = rep("normal", nrow(trem2test))
+trem2test[which(trem2test$R62H=="1"), "trem2_geno"] = "R62H"
+trem2test[which(trem2test$P208A=="1"), "trem2_geno"] = "P208A"
+
+trem2geno_input = table(trem2test[, c("cluster", "trem2_geno")])
+
+print(trem2geno_input)
+streamlinechisq(trem2geno_input)
+streamlinetest(trem2geno_input)
+
+# however, R26H individuals seem to have less severe pathology
+table(trem2test[, c("pathology.group", "trem2_geno")])
+
+# projection of genotype on microglia clusters; three individuals separately, then two genotypes
+microgliadf = readRDS("rosmap.microglia.subcluster.rds")
+
+# plot the two genotypes, then the three individuals
+DimPlot(microgliadf, reduction = "tsne")
+mutatcelldf = trem2test[which(trem2test$trem2_geno!="normal"),]
+
+# genotypes
+micr26h = dplyr::filter(mutatcelldf, trem2_geno == "R62H")%>%select(TAG)%>%unlist()%>%as.vector()
+micp208a = dplyr::filter(mutatcelldf, trem2_geno == "P208A")%>%select(TAG)%>%unlist()%>%as.vector()
+micnormal = dplyr::filter(trem2test, trem2_geno == "normal")%>%select(TAG)%>%unlist()%>%as.vector()
+
+DimPlot(microgliadf, cells.highlight = micr26h, reduction = "tsne") +ggtitle("R26H")
+DimPlot(microgliadf, cells.highlight = micp208a, reduction = "tsne")+ggtitle("P208A")
+
+# individuals
+indi3 = micp208a
+indi1 =  dplyr::filter(mutatcelldf, trem2_geno == "R62H"& pathology.group == "no-pathology")%>%select(TAG)%>%unlist()%>%as.vector()
+indi2 =  dplyr::filter(mutatcelldf, trem2_geno == "R62H"& pathology.group == "early-pathology")%>%select(TAG)%>%unlist()%>%as.vector()
+
+DimPlot(microgliadf, cells.highlight = indi1, reduction = "tsne") +ggtitle("R26H male no-pathology")
+DimPlot(microgliadf, cells.highlight = indi2, reduction = "tsne") +ggtitle("R26H male early-pathology")
+DimPlot(microgliadf, cells.highlight = indi3, reduction = "tsne") +ggtitle("P208A female late-pathology")
+
+# expression signature between R26H and normal, P208A and normal
+cellswithgeno = subset(microgliadf, cells = trem2test$TAG)
+
+cellswithgeno = SetIdent(object = cellswithgeno, cells = micr26h, value = "r26h")
+cellswithgeno = SetIdent(object = cellswithgeno, cells = micp208a, value = "p208a")
+cellswithgeno = SetIdent(object = cellswithgeno, cells = micnormal, value = "normal")
+
+DimPlot(cellswithgeno, reduction = "tsne", label = F)
+
+r62hmarker = FindMarkers(cellswithgeno, ident.1 = "r26h", ident.2 = "normal", min.pct = 0.25)
+p208amarker = FindMarkers(cellswithgeno, ident.1 = "p208a", ident.2 = "normal", min.pct = 0.25)
+
+# keep a copy of those list
+write.table(r62hmarker, file = "rosmap.microglia.r62h.normal.txt", quote = F, sep = "\t", col.names = T, row.names = F)
+write.table(p208amarker, file = "rosmap.microglia.p208a.normal.txt", quote = F, sep = "\t", col.names = T, row.names = F)
+
+r62hmarker[,"gene"] = rownames(r62hmarker)
+p208amarker[,"gene"] = rownames(p208amarker)
+
+r62hsig = dplyr::filter(r62hmarker, p_val_adj < 0.05)
+p208asig = dplyr::filter(p208amarker, p_val_adj < 0.05)
+
+# show the significant ones ordered by log fold change
+r62hsig[order(r62hsig[,"avg_logFC"], decreasing = T),]
+p208asig[order(p208asig[,"avg_logFC"], decreasing = T),]
+
+# check the microglia cluster 0
+
+# microglia 0 gene signature when compared to microglia 1 (instead of all other groups)
+mic0to1 = FindMarkers(microgliadf, ident.1 = "0", ident.2 = "1", min.pct = 0.25)
+
+mic0to1[,"gene"] = rownames(mic0to1)
+
+mic0to1sig =  dplyr::filter(mic0to1, p_val_adj < 0.05)
+
+upinmic0 = dplyr::filter(mic0to1sig, avg_logFC >0)
+
+# microglia cluster 0 disease versus no disease
+microgliadf
+
+
+
