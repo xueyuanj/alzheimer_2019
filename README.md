@@ -101,6 +101,8 @@ $ categorical.test.Rmd
 ##
 Compare genes upregulated in mouse DAM to those in human microglia 1 
 
+$ human_mouse.gene.R
+
 ##
 Try Monocle 3 trajectory analysis
 
