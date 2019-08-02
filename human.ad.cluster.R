@@ -9,8 +9,23 @@ library(Seurat)
 
 setwd("/public_genomic_data_downloads/czhang/sharon/")
 
+# obtain the data from ROSMAP project
+filtered.counts = readMM("filtered_count_matrix.mtx")
+rownames(filtered.counts) = readLines("filtered_gene_row_names.txt")
+filtered.colMetadata = read.delim("filtered_column_metadata.txt")
+
+colnames(filtered.counts) = filtered.colMetadata$TAG
+
+# start with Seurat
+
+seurat.filtered = CreateSeuratObject(counts = filtered.counts, project = "rosmap", min.cells = 3, min.features = 200)
+
+# save a copy the RDS
+saveRDS(seurat.filtered, file = "~/Documents/2019_summer_eisai/processed_data/rosmap.filtered.seurat.raw.rds")
+
 seurat.filtered = readRDS("/public_genomic_data_downloads/czhang/sharon/rosmap.filtered.seurat.raw.rds")
 
+# follow the standard pipeline
 allgenes = rownames(seurat.filtered)
 
 # VlnPlot(seurat.filtered, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
@@ -74,8 +89,8 @@ ggsave(astmarker, filename = "rosmap.tsne.ast.jpeg",width = 10, height = 8, dpi 
 endmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("FLT1", "CLDN5", "FLT1", "CLDN5"))
 ggsave(endmarker, filename = "rosmap.tsne.end.jpeg",width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
 
-# due to the complex colors, plot each cluster, then collapse them
 
+# due to the complex colors, plot each cluster, then collapse them
 seurat.filtered = readRDS("/public_genomic_data_downloads/czhang/sharon/rosmap.filtered.seurat.tsne.rds")
 
 ori_cluster_id = as.data.frame( seurat.filtered$seurat_clusters)
@@ -98,6 +113,7 @@ for (i in 0:18) {
   
 }
 
+# the cluster-cell type match was done on a real notebook, by doodling
 
 # verify the identity of microglia, how much they overlap with the results in the paper
 
@@ -134,7 +150,7 @@ seurat.filtered = SetIdent(object = seurat.filtered, cells = oligoprogenitor, va
 astrocyte = dplyr::filter(ori_cluster_id, cluster == "6")%>%select(cell)%>%unlist()%>%as.vector() 
 seurat.filtered = SetIdent(object = seurat.filtered, cells = astrocyte, value = "astrocyte")
 
-# nuerons
+# neurons
 allnuerons = dplyr::filter(ori_cluster_id, cluster == "1"| cluster =="2"| cluster =="3"| cluster =="4"| cluster =="5"|
                              cluster =="7"| cluster =="8"| cluster == "10"| cluster =="12"| cluster =="13"| cluster == "14"| cluster =="15"| cluster =="16")%>%select(cell)%>%unlist()%>%as.vector() 
 
@@ -190,7 +206,6 @@ noad =dplyr::filter(mergeid, pathology.group == "no-pathology")%>%select(projid)
 adcells = dplyr::filter(paper_tsne, projid %in% adpatient)%>%select(TAG)%>%unlist()%>%as.vector()
 noadcells = dplyr::filter(paper_tsne, projid %in% noad)%>%select(TAG)%>%unlist()%>%as.vector()
 
-
 # identify DEG in each cell type
 # ad vs noad
 
@@ -200,7 +215,6 @@ colnames(rosmap_cluster_id) = c("cluster", "cell")
 
 major6types = c("excitatory neurons", "inhibitory neurons", "astrocyte", "oligodendrocyte progenitor",
                 "oligodendrocyte", "microglia")
-
 
 for(i in 1:length(major6types)){
   thiscluster = major6types[i]
@@ -218,7 +232,7 @@ for(i in 1:length(major6types)){
   write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
 }
 
-
+# get the differentially expressed genes in each category
 # early vs no ad
 # late vs early
 # late vs no ad
@@ -253,7 +267,7 @@ for(i in 1:length(major6types)){
   
 }
 
-# subcluster of the microglia
+# subcluster of the microglia (into 4 subclusters)
 microgliacluster = subset (seurat.filtered, idents = "microglia")
 microgliacluster = NormalizeData(microgliacluster)
 microgliacluster = FindVariableFeatures(microgliacluster, selection.method = "disp", nfeatures = 3188)
@@ -371,6 +385,7 @@ sink()
 # save a copy
 #write.table(cat_p_correct, file = "trait_subpop.cat.association.txt", quote = F, col.names = T, sep = "\t")
 
+# test for quantitative traits
 # boostrap for microglia subclusters and traits
 cluster_ids = c("0", "1", "2", "3")
 
