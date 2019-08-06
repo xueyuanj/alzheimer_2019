@@ -9,23 +9,8 @@ library(Seurat)
 
 setwd("/public_genomic_data_downloads/czhang/sharon/")
 
-# obtain the data from ROSMAP project
-filtered.counts = readMM("filtered_count_matrix.mtx")
-rownames(filtered.counts) = readLines("filtered_gene_row_names.txt")
-filtered.colMetadata = read.delim("filtered_column_metadata.txt")
-
-colnames(filtered.counts) = filtered.colMetadata$TAG
-
-# start with Seurat
-
-seurat.filtered = CreateSeuratObject(counts = filtered.counts, project = "rosmap", min.cells = 3, min.features = 200)
-
-# save a copy the RDS
-saveRDS(seurat.filtered, file = "~/Documents/2019_summer_eisai/processed_data/rosmap.filtered.seurat.raw.rds")
-
 seurat.filtered = readRDS("/public_genomic_data_downloads/czhang/sharon/rosmap.filtered.seurat.raw.rds")
 
-# follow the standard pipeline
 allgenes = rownames(seurat.filtered)
 
 # VlnPlot(seurat.filtered, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
@@ -89,8 +74,8 @@ ggsave(astmarker, filename = "rosmap.tsne.ast.jpeg",width = 10, height = 8, dpi 
 endmarker = FeaturePlot(seurat.filtered, reduction = "tsne", features = c("FLT1", "CLDN5", "FLT1", "CLDN5"))
 ggsave(endmarker, filename = "rosmap.tsne.end.jpeg",width = 10, height = 8, dpi = 150, units = "in", device='jpeg')
 
-
 # due to the complex colors, plot each cluster, then collapse them
+
 seurat.filtered = readRDS("/public_genomic_data_downloads/czhang/sharon/rosmap.filtered.seurat.tsne.rds")
 
 ori_cluster_id = as.data.frame( seurat.filtered$seurat_clusters)
@@ -113,7 +98,6 @@ for (i in 0:18) {
   
 }
 
-# the cluster-cell type match was done on a real notebook, by doodling
 
 # verify the identity of microglia, how much they overlap with the results in the paper
 
@@ -150,7 +134,7 @@ seurat.filtered = SetIdent(object = seurat.filtered, cells = oligoprogenitor, va
 astrocyte = dplyr::filter(ori_cluster_id, cluster == "6")%>%select(cell)%>%unlist()%>%as.vector() 
 seurat.filtered = SetIdent(object = seurat.filtered, cells = astrocyte, value = "astrocyte")
 
-# neurons
+# nuerons
 allnuerons = dplyr::filter(ori_cluster_id, cluster == "1"| cluster =="2"| cluster =="3"| cluster =="4"| cluster =="5"|
                              cluster =="7"| cluster =="8"| cluster == "10"| cluster =="12"| cluster =="13"| cluster == "14"| cluster =="15"| cluster =="16")%>%select(cell)%>%unlist()%>%as.vector() 
 
@@ -206,6 +190,7 @@ noad =dplyr::filter(mergeid, pathology.group == "no-pathology")%>%select(projid)
 adcells = dplyr::filter(paper_tsne, projid %in% adpatient)%>%select(TAG)%>%unlist()%>%as.vector()
 noadcells = dplyr::filter(paper_tsne, projid %in% noad)%>%select(TAG)%>%unlist()%>%as.vector()
 
+
 # identify DEG in each cell type
 # ad vs noad
 
@@ -215,6 +200,7 @@ colnames(rosmap_cluster_id) = c("cluster", "cell")
 
 major6types = c("excitatory neurons", "inhibitory neurons", "astrocyte", "oligodendrocyte progenitor",
                 "oligodendrocyte", "microglia")
+
 
 for(i in 1:length(major6types)){
   thiscluster = major6types[i]
@@ -232,7 +218,7 @@ for(i in 1:length(major6types)){
   write.table(markers, file = tablename, quote = F, row.names = T, col.names = T, sep = "\t")
 }
 
-# get the differentially expressed genes in each category
+
 # early vs no ad
 # late vs early
 # late vs no ad
@@ -267,7 +253,7 @@ for(i in 1:length(major6types)){
   
 }
 
-# subcluster of the microglia (into 4 subclusters)
+# subcluster of the microglia
 microgliacluster = subset (seurat.filtered, idents = "microglia")
 microgliacluster = NormalizeData(microgliacluster)
 microgliacluster = FindVariableFeatures(microgliacluster, selection.method = "disp", nfeatures = 3188)
@@ -333,6 +319,15 @@ for (i in 1:length(fourcluster)) {
 }
 
 
+# parse the mic signature gene list a little bit
+mic1_sj = read.table("mic_subcluster.1.txt", header = T)
+mic1_sj = mic1_sj[order(mic1_sj$avg_logFC, decreasing = T),]
+mic1_sj[,"gene"] = rownames(mic1_sj)
+mic1_sj = dplyr::filter(mic1_sj, avg_logFC > 0.5 & p_val_adj < 0.01)
+#98 genes
+mic1_show = mic1_sj[, c("gene", "avg_logFC", "p_val")]
+write.table(mic1_show, file = "mic1.genes.to.show.txt", quote = F, sep = "\t", row.names = F, col.names = T)
+
 # first merge all the available information
 cell_patient = paper_tsne[,c("TAG", "projid")]
 cluster_patient = merge(cell_patient, microglia_cluster_id, by="TAG")
@@ -385,7 +380,6 @@ sink()
 # save a copy
 #write.table(cat_p_correct, file = "trait_subpop.cat.association.txt", quote = F, col.names = T, sep = "\t")
 
-# test for quantitative traits
 # boostrap for microglia subclusters and traits
 cluster_ids = c("0", "1", "2", "3")
 
@@ -801,13 +795,91 @@ p208asig[order(p208asig[,"avg_logFC"], decreasing = T),]
 mic0to1 = FindMarkers(microgliadf, ident.1 = "0", ident.2 = "1", min.pct = 0.25)
 
 mic0to1[,"gene"] = rownames(mic0to1)
-
 mic0to1sig =  dplyr::filter(mic0to1, p_val_adj < 0.05)
-
 upinmic0 = dplyr::filter(mic0to1sig, avg_logFC >0)
+upinmic0
 
 # microglia cluster 0 disease versus no disease
-microgliadf
+cell_trait = readRDS("microglia.subcluster.trait.rds")
 
+# subset the Mic 0 cluster
+mic0cells = subset(microgliadf, ident = "0")
 
+healthycell = dplyr::filter(cell_trait, cluster == "0" & pathology.group == "no-pathology")%>%select(TAG)%>%unlist()%>%as.vector()
+diseasecell = dplyr::filter(cell_trait, cluster == "0" & pathology.group != "no-pathology")%>%select(TAG)%>%unlist()%>%as.vector()
 
+mic0cells = SetIdent(object = mic0cells, cells = healthycell, value = "no-pathology")
+mic0cells = SetIdent(object = mic0cells, cells = diseasecell, value = "pathology")
+
+# check the distribution of microglia cluster 0 from diseased individuals
+DimPlot(mic0cells, reduction = "tsne", cells.highlight = diseasecell)
+# totally mixed together
+
+# DEG between microglia cluster 0 no-pathology and pathology group
+mic0disease = FindMarkers(mic0cells, ident.1 = "pathology", ident.2 = "no-pathology", min.pct = 0.25)
+mic0disease[, "gene"] = rownames(mic0disease)
+
+write.table(mic0disease, file = "rosmap.microglia.cluster0.disease.txt", quote = F, sep = "\t", col.names = T, row.names = F)
+
+mic0disease.sig =  dplyr::filter(mic0disease, p_val_adj < 0.05)
+mic0disease.sig[order(mic0disease.sig[,"avg_logFC"], decreasing = T),]
+
+# check the number of cells those mutant individuals have
+# get the projid of those individuals
+trem2m_projid = dplyr::filter(checktrem2, total_mut== "1")%>%select(projid)%>%unlist()%>%as.vector()
+
+allindividual = dplyr::select(paper_tsne, projid)%>%unlist()%>%as.vector()%>%unique()
+
+cell_stat = sapply(allindividual, function(x){
+  paper_id = dplyr::filter(paper_tsne, projid == x)
+  return(table(paper_id$broad.cell.type))
+} )
+colnames(cell_stat) = allindividual
+cell_stat = as.data.frame(cell_stat)
+
+# the microglia numbers
+summary(cell_stat["Mic",])
+plot(hist(cell_stat["Mic",], breaks = 5), main= "Histogram of microglia numbers" , xlab= "microglia number")
+
+# all the brain cell numbers
+summary(colSums(cell_stat))
+plot(hist(colSums(cell_stat), breaks = 5), main= "Histogram of brain numbers" , xlab= "brain number")
+
+# the interesting individuals
+trem2cellstat = cell_stat[, as.character(trem2m_projid)]
+trem2cellstat["total",] = colSums(trem2cellstat)
+colnames(trem2cellstat) = c("R62H_no", "R62H_early", "P208A")
+trem2cellstat
+
+# check the percentage of cells in cluster 0/1 for each Trem2 genotype
+# male normal individuals
+mic_male_wt = dplyr::filter(trem2test, msex =="male" & trem2_geno=="normal")
+
+checknormal_m = table(mic_male_wt[, c("cluster", "pathology.group")])
+checknormal_m = as.matrix(checknormal_m)
+normal_m = matrix(NA, nrow = 4, ncol = 2)
+normal_m[,1] = checknormal_m[,"no-pathology"]; normal_m[,2] =  checknormal_m[,"early-pathology"] + checknormal_m[, "late-pathology"]
+colnames(normal_m) = c("no-pathology", "pathology")
+rownames(normal_m) = c("0", "1", "2", "3")
+mic1_per_m = normal_m["1",]/colSums(normal_m)
+mic1_per_m
+
+# female normal individuals
+mic_female_wt = dplyr::filter(trem2test, msex =="female" & trem2_geno=="normal")
+
+checknormal_fm = table(mic_female_wt[, c("cluster", "pathology.group")])
+checknormal_fm = as.matrix(checknormal_fm)
+normal_fm = matrix(NA, nrow = 4, ncol = 2)
+normal_fm[,1] = checknormal_fm[,"no-pathology"]; normal_fm[,2] =  checknormal_fm[,"early-pathology"] + checknormal_fm[, "late-pathology"]
+colnames(normal_fm) = c("no-pathology", "pathology")
+rownames(normal_fm) = c("0", "1", "2", "3")
+mic1_per_fm = normal_fm["1",]/colSums(normal_fm)
+mic1_per_fm
+
+# P208A female
+p208_mic1_p = trem2geno_input["1","P208A"]/sum(trem2geno_input[,"P208A"])
+p208_mic1_p
+
+# R62H males
+r62h_mic1_p = trem2geno_input["1","R62H"]/sum(trem2geno_input[,"R62H"])
+r62h_mic1_p
