@@ -261,6 +261,40 @@ upinmac1 = dplyr::filter(mac1_3_sig,avg_logFC<0)
 head(upinmac1, 20)
 head(upinmac3, 20)
 
+
+# get DEG between Mac2 and Mac 3
+mac2_3 = FindMarkers(wtm_2celltype, ident.1 = "macrophage 3", ident.2 ="macrophage 2", min.pct = 0.25)
+mac2_3[,"gene"] = rownames(mac2_3)
+mac2_3_sig = dplyr::filter(mac2_3, p_val_adj < 0.001)
+
+# keep a copy of the file
+write.table(mac2_3_sig, file = "/public_genomic_data_downloads/czhang/sharon/fat_trem2/results/macrophage.2.3.deg.txt",
+            quote = F, sep = "\t", col.names = T, row.names = F)
+
+upinmac3 =  dplyr::filter(mac2_3_sig,avg_logFC>0)
+upinmac1 = dplyr::filter(mac2_3_sig,avg_logFC<0)
+
+head(upinmac1, 20)
+head(upinmac3, 20)
+
+
+
+# get DEG between Mac1 and Mac 2
+mac1_2 = FindMarkers(wtm_2celltype, ident.1 = "macrophage 2", ident.2 ="macrophage 1", min.pct = 0.25)
+mac1_2[,"gene"] = rownames(mac1_2)
+mac1_2_sig = dplyr::filter(mac1_2, p_val_adj < 0.001)
+
+# keep a copy of the file
+write.table(mac1_2_sig, file = "/public_genomic_data_downloads/czhang/sharon/fat_trem2/results/macrophage.1.2.deg.txt",
+            quote = F, sep = "\t", col.names = T, row.names = F)
+
+upinmac2 =  dplyr::filter(mac1_2_sig,avg_logFC>0)
+upinmac1 = dplyr::filter(mac1_2_sig,avg_logFC<0)
+
+head(upinmac1, 20)
+head(upinmac2, 20)
+
+
 # download the processed human data (OAT)
 human_oat = dplyr::filter(design_infor, `organ:ch1`=="OAT")
 oat_urls = select(human_oat, supplementary_file_1)%>%unlist()%>%as.character()
@@ -272,28 +306,145 @@ oat_urls = select(human_oat, supplementary_file_1)%>%unlist()%>%as.character()
 
 setwd("/public_genomic_data_downloads/czhang/sharon/fat_trem2/GSE128518_RAW")
 
-trem2_ko_hfd = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 knock-out C57BL/6"&`treatment (diet):ch1` == "High-fat diet")
-trem2_ko_nc = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 knock-out C57BL/6"&`treatment (diet):ch1` == "Normal chow")
+#hfd_trem_part = rbind(trem2_ko_hfd, litterm_hfd)
 
-litterm_hfd = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 wild-type C57BL/6 Littermates"&`treatment (diet):ch1` == "High-fat diet")
-litterm_nc = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 wild-type C57BL/6 Littermates"&`treatment (diet):ch1` == "Normal chow")
 
-hfd_trem_part = rbind(trem2_ko_hfd, litterm_hfd)
+# ignore the paper, QC with both Trem2 KO and their WT littermates (both HFD and NC)
 
-hfd_trem_supp = select(hfd_trem_part, supplementary_file_1)%>%unlist()%>%as.character() 
-hfd_trem_f = sapply(hfd_trem_supp, function(x) {
+trem_part = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 knock-out C57BL/6"|`strain:ch1` == "Trem2 wild-type C57BL/6 Littermates")
+
+trem_supp = select(trem_part, supplementary_file_1)%>%unlist()%>%as.character() 
+trem_f = sapply(trem_supp, function(x) {
   gzfile = unlist(strsplit(x, "/"))[9] 
   unzipfile = sub(".gz", "", gzfile)
 },  USE.NAMES = F ) 
 
 
-hfd_trem_df = lapply(hfd_trem_f, function(x){
+trem_df = lapply(trem_f, function(x){
   read.csv(list.files(pattern = x), sep="\t", header=TRUE)})
 
-hfd_trem_data = data.frame(hfd_trem_df)
+trem_data = data.frame(trem_df)
+
+#> dim(trem_data)
+#[1] 52634 14976
+# before integrate NC, 10368 cells. Very little NC cells anyway
 
 
-# human part
+# QC of the cells from high-fat diet
+trem_seurat = CreateSeuratObject(counts = trem_data, assay = "RNA", project = "Trem2 part", min.cells = 3,
+                                     min.features = 200)
+
+# save a copy
+saveRDS(trem_seurat, file = "/public_genomic_data_downloads/czhang/sharon/fat_trem2/processed_data/lam.trem2.seurat.raw.rds")
+
+trem_seurat[["percent.mt"]] = PercentageFeatureSet(trem_seurat, pattern = "^mt")
+trem_seurat[["percent.ERCC"]] = PercentageFeatureSet(trem_seurat, pattern = "^ERCC")
+
+VlnPlot(trem_seurat, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+VlnPlot(trem_seurat, features = c("percent.mt", "percent.ERCC"), ncol = 2)
+
+# no ERCC in this dataset
+
+cor_plot1 = FeatureScatter(trem_seurat, feature1 = "nCount_RNA", feature2 = "percent.mt")
+cor_plot2 = FeatureScatter(trem_seurat, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+#cor_plot3 = FeatureScatter(trem_seurat, feature1 = "nCount_RNA", feature2 = "percent.ERCC")
+
+CombinePlots(plots = list(cor_plot1, cor_plot2))
+
+# filter out low-quality ones
+trem_seurat_filter = subset(trem_seurat, subset =  nCount_RNA > 400  & percent.mt < 40)
+
+trem_seurat_filter = trem_seurat_filter[endogenes,]
+# 24218 genes, 10792 cells
+
+# normalize
+trem_seurat_filter = NormalizeData(trem_seurat_filter)
+trem_seurat_filter = FindVariableFeatures(trem_seurat_filter, selection.method = "disp", nfeatures = 425)
+
+# run tSNE, isolate monocytes and macrophages
+trem_seurat_filter = ScaleData(trem_seurat_filter)
+trem_seurat_filter = RunPCA(trem_seurat_filter, features = VariableFeatures(object = trem_seurat_filter))
+
+trem_seurat_filter = FindNeighbors(trem_seurat_filter, dims = 1:15, k.param = 30)
+trem_seurat_filter = FindClusters(trem_seurat_filter, resolution = 0.2)
+trem_seurat_filter = RunTSNE(trem_seurat_filter, features = VariableFeatures(object = trem_seurat_filter))
+#wtm_seurat_filter = RunUMAP(wtm_seurat_filter, features = VariableFeatures(object = wtm_seurat_filter))
+
+DimPlot(trem_seurat_filter, reduction = "tsne")
+
+# plot the marker genes
+# monocyte
+FeaturePlot(trem_seurat_filter, features = c("Lyz1", "Fn1", "Mrc1"), reduction = "tsne")
+# cluster 4
+
+# macrophage
+FeaturePlot(trem_seurat_filter, features = c("Mrc1", "C1qc", "Apoe"), reduction = "tsne")
+# cluster 0
+
+# save a copy
+saveRDS(trem_seurat_filter, file = "/public_genomic_data_downloads/czhang/sharon/fat_trem2/processed_data/lam.trem2.seurat.clustered.rds")
+
+# isolate cluster 0 and 4
+trem2_mon_mac = subset(trem_seurat_filter, idents = c("0", "4"))
+
+# quick check
+#DimPlot(trem2_mon_mac, reduction = "tsne")
+
+wtm_2celltype = FindVariableFeatures(wtm_2celltype, selection.method = "disp", nfeatures = 200)
+trem2_mon_mac = FindVariableFeatures(trem2_mon_mac, selection.method = "disp", nfeatures = 200)
+
+trem_anchor = FindTransferAnchors(reference = wtm_2celltype, query = trem2_mon_mac, dims = 1:30)
+predictions = TransferData(anchorset = trem_anchor, refdata = Idents(wtm_2celltype))
+trem2_mon_mac= AddMetaData(trem2_mon_mac, metadata = predictions)
+
+# plot the expression of gene markers
+# Mac 1
+VlnPlot(trem2_mon_mac, c("C4b", "F13a1"), group.by = "predicted.id")
+VlnPlot(trem2_mon_mac, c("Cbr2", "Lyve1"), group.by = "predicted.id")
+
+# Mac 2 and LAM
+VlnPlot(trem2_mon_mac, c("Trem2", "Nceh1"), group.by = "predicted.id")
+VlnPlot(trem2_mon_mac, c("Cd36", "Cd9"), group.by = "predicted.id")
+VlnPlot(trem2_mon_mac, c("Ctsl", "Lpl", "Fabp4"), group.by = "predicted.id")
+
+# save a copy
+saveRDS(trem2_mon_mac, file = "/public_genomic_data_downloads/czhang/sharon/fat_trem2/processed_data/lam.trem2.projection.rds")
+
+# aliquote cells of different conditions
+
+# select each dataframe
+trem2_ko_hfd = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 knock-out C57BL/6"&`treatment (diet):ch1` == "High-fat diet")%>%select(title)%>%unlist()%>%as.vector()
+trem2_ko_nc = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 knock-out C57BL/6"&`treatment (diet):ch1` == "Normal chow")%>%select(title)%>%unlist()%>%as.vector()
+litterm_hfd = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 wild-type C57BL/6 Littermates"&`treatment (diet):ch1` == "High-fat diet")%>%select(title)%>%unlist()%>%as.vector()
+litterm_nc = dplyr::filter(m_design_infor, `strain:ch1` == "Trem2 wild-type C57BL/6 Littermates"&`treatment (diet):ch1` == "Normal chow")%>%select(title)%>%unlist()%>%as.vector()
+
+# select cells of each category
+cells_trem2_ko_hfd = dplyr::filter(allcellmeta, Amp_batch_ID%in%trem2_ko_hfd)%>%select(Well_ID)%>%unlist()%>%as.vector()
+cells_litterm_hfd = dplyr::filter(allcellmeta, Amp_batch_ID%in%litterm_hfd)%>%select(Well_ID)%>%unlist()%>%as.vector()
+cells_trem2_ko_nc = dplyr::filter(allcellmeta, Amp_batch_ID%in%trem2_ko_nc)%>%select(Well_ID)%>%unlist()%>%as.vector()
+cells_litterm_nc = dplyr::filter(allcellmeta, Amp_batch_ID%in%litterm_nc)%>%select(Well_ID)%>%unlist()%>%as.vector()
+  
+seurat_trem2_ko_hfd = subset(trem2_mon_mac, cells= cells_trem2_ko_hfd)
+seurat_litterm_hfd = subset(trem2_mon_mac, cells= cells_litterm_hfd)
+seurat_trem2_ko_nc = subset(trem2_mon_mac, cells= cells_trem2_ko_nc)
+seurat_litterm_nc = subset(trem2_mon_mac, cells= cells_litterm_nc)
+
+summarytable = rbind(table(seurat_litterm_nc$predicted.id),
+                     table(seurat_trem2_ko_nc$predicted.id),
+                     table(seurat_litterm_hfd$predicted.id),
+                     table(seurat_trem2_ko_hfd$predicted.id)
+                     )
+rownames(summarytable) = c("wt_nc", "ko_nc", "wt_hfd", "ko_hfd")
+summarytable = t(summarytable)
+
+barplot(summarytable, col = c("darkseagreen1", "slategray1", "mediumpurple", "indianred1")) 
+legend(0.2, 2500 ,legend = rev(rownames(summarytable)),
+       col = rev(c("darkseagreen1", "slategray1", "mediumpurple", "indianred1")),
+       lty=1:2, cex=1)
+
+# get the percentage one
 
 
+percent_table =t(t(summarytable)/colSums(summarytable)) 
+barplot(percent_table, col = c("darkseagreen1", "slategray1", "mediumpurple", "indianred1")) 
 
