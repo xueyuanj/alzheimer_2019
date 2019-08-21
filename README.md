@@ -104,7 +104,7 @@ Diego A Jaitin, et al. 2019. Cell. (GSE128518 single-cell RNA-seq)
 
 ##
 
-single script
+one single script
 
 $ fat.trem2.R
 
