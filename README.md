@@ -97,3 +97,23 @@ $ human_mouse.gene.R
 Try Monocle 3 trajectory analysis
 
 $ rosmap.monocle.R
+
+## 4.single-cell RNA-seq identifies lipid-associated microglial (LAM)
+
+Diego A Jaitin, et al. 2019. Cell. (GSE128518 single-cell RNA-seq)
+
+##
+
+single script
+
+$ fat.trem2.R
+
+1) kNN of immune cells from C57BL/6J mouse adipose immune cells
+
+2) expansion of macrophage during obesity progression (HFD feeding)
+
+3) kNN of Trem2-/- mouse adipose immnue cells
+
+4) decrease of LAM
+
+5) similar study on human patients (one obese individual and six others)
