@@ -845,3 +845,38 @@ cd45_m = matrix(c(23, 37, 38, 41, 43, 44, 9.369676e-03, 0.01256983, 0.03825137,
 colnames(cd45_m) = c("bmi", "%LAM(CD45+)")
 
 plot(cd45_m[,1], cd45_m[,2]*100, xlab = "bmi", ylab = "%LAM(CD45+)", pch = 19, col = "red")
+
+######################################################################################
+# based on feedback from Jhon, plot markers of M1 and M2 on the macrophage subclusters
+
+# M1 markers
+# mouse
+FeaturePlot(wtm_2celltype, features = c("Ccr7", "Tnf", "Il6", "Il12b"), reduction = "tsne")
+#FeaturePlot(wtm_2celltype, features = c("Il15ra", "Ccl2", "Ccl5", "Ccr7"), reduction = "tsne")
+#FeaturePlot(wtm_2celltype, features = c("Nos2", "Cd80", "Cd86", "Il12b"), reduction = "tsne")
+
+# human
+# the one obese individual
+FeaturePlot(h_obese_mac, features = c("CCR7", "TNF", "IL6", "IL12B", "IFNG"), reduction = "tsne")
+#FeaturePlot(h_obese_mac, features = c("IL15RA", "CCL2", "CCL5", "CCR7"), reduction = "tsne")
+#FeaturePlot(h_obese_mac, features = c("CD80", "CD86", "IFNG"), reduction = "tsne")
+
+# the other 6 individuals
+FeaturePlot(h_other6_mac, features = c("CCR7", "TNF", "IL6", "IL12B", "IFNG"), reduction = "tsne")
+#FeaturePlot(h_other6_mac, features = c("IL15RA", "CCL2", "CCL5", "CCR7"), reduction = "tsne")
+#FeaturePlot(h_other6_mac, features = c("CD80", "CD86", "IFNG"), reduction = "tsne")
+
+
+# M2 markers
+# mouse
+FeaturePlot(wtm_2celltype, features = c("Il1rn", "Tgfb1",  "Mrc1", "Ccl16-ps", "Arg1"), reduction = "tsne")
+
+
+# human
+# the one obese individual
+FeaturePlot(h_obese_mac, features = c("IL1RN", "TGFB1",  "MRC1", "CCL16", "ARG1"), reduction = "tsne")
+
+
+# the other 6 individuals
+FeaturePlot(h_other6_mac, features = c("IL1RN", "TGFB1",  "MRC1", "CCL16"), reduction = "tsne")
+
